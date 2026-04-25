@@ -116,7 +116,13 @@ async function notionFetch(path, { method = "GET", body } = {}) {
   //  method,
   //  ...(body ? { body: JSON.stringify(body) } : {}),
   //});
-  const res = await fetch(url, {method});
+  const res = await fetch(url, {
+    method,
+    header: {
+      "Content-Type": "application/json"
+    },
+    ...(body ? { body: JSON.stringify(body) } : {})
+  });
 
   if (!res.ok) {
     const text = await res.text();
@@ -127,8 +133,7 @@ async function notionFetch(path, { method = "GET", body } = {}) {
     return null;
   }
 
-  //return res.json();
-  return res;
+  return res.json();
 }
 
 async function getDatabase(databaseId) {
