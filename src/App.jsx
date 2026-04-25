@@ -118,7 +118,7 @@ function requireConfig() {
 
 async function notionFetch(path, { method = "GET", body } = {}) {
   requireConfig();
-  const url = `/api${path}`;
+  const url = `https://gtd-worker.snerh6.workers.dev/api${path}`;
   const res = await fetch(encodeURIComponent(url), {
     method,
     ...(body ? { body: JSON.stringify(body) } : {}),
