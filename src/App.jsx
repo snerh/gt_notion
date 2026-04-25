@@ -111,7 +111,6 @@ function itemKey(item) {
 }
 
 async function notionFetch(path, { method = "GET", body } = {}) {
-  requireConfig();
   const url = `https://gtd-worker.snerh6.workers.dev/api${path}`;
   const res = await fetch(encodeURIComponent(url), {
     method,
