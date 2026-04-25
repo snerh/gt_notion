@@ -133,7 +133,8 @@ async function notionFetch(path, { method = "GET", body } = {}) {
     return null;
   }
 
-  return res.json();
+  //return res.json();
+  return res;
 }
 
 async function getDatabase(databaseId) {
