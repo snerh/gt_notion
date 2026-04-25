@@ -110,12 +110,6 @@ function itemKey(item) {
   return item ? `${item.type}:${item.id}` : "";
 }
 
-function requireConfig() {
-  if (!NOTION_CONFIG.token) {
-    throw new Error("Не задан Notion token.");
-  }
-}
-
 async function notionFetch(path, { method = "GET", body } = {}) {
   requireConfig();
   const url = `https://gtd-worker.snerh6.workers.dev/api${path}`;
