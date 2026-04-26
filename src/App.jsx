@@ -116,7 +116,7 @@ async function notionFetch(path, { method = "GET", body } = {}) {
   //  method,
   //  ...(body ? { body: JSON.stringify(body) } : {}),
   //});
-  const res = await fetch(encodeURIComponent(url), {
+  const res = await fetch(url, {
     method,
     headers: {
       "Content-Type": "application/json",
