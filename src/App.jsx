@@ -112,7 +112,7 @@ function itemKey(item) {
 
 async function notionFetch(path, { method = "GET", body } = {}) {
   const url = `https://gtd-worker.snerh6.workers.dev/api${path}`;
-  //const res = await fetch(encodeURIComponent(url), {
+  //const res = await fetch(url, {
   //  method,
   //  ...(body ? { body: JSON.stringify(body) } : {}),
   //});
