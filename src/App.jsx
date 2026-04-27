@@ -735,7 +735,7 @@ function TaskDetailPanel({
   const dirty = JSON.stringify(form) !== JSON.stringify(task);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
-  useEffect(() => {
+  /* useEffect(() => {
     if (!dirty) {
       return;
     }
@@ -743,7 +743,7 @@ function TaskDetailPanel({
       onSave(form);
     }, 600);
     return () => clearTimeout(timeoutId);
-  }, [dirty, form, task.id]);
+  }, [dirty, form, task.id]); */
 
   return (
     <div
@@ -781,7 +781,24 @@ function TaskDetailPanel({
           Задача
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {dirty && <span style={{ color: THEME.primarySoft, fontSize: 11 }}>сохранение...</span>}
+          {dirty && (
+            <button
+              onClick={() => onSave(form)}
+              style={{
+                background: "#1D4ED8",
+                border: "none",
+                borderRadius: 5,
+                padding: "3px 10px",
+                color: "white",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Сохранить
+            </button>
+          )}
           <button
             onClick={onClose}
             style={{
@@ -1013,7 +1030,7 @@ function ProjectDetailPanel({
   const dirty = JSON.stringify(form) !== JSON.stringify(project);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
-  useEffect(() => {
+  /* useEffect(() => {
     if (!dirty) {
       return;
     }
@@ -1021,7 +1038,7 @@ function ProjectDetailPanel({
       onSave(form);
     }, 600);
     return () => clearTimeout(timeoutId);
-  }, [dirty, form, project.id]);
+  }, [dirty, form, project.id]); */
 
   return (
     <div
@@ -1059,7 +1076,24 @@ function ProjectDetailPanel({
           Проект
         </span>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          {dirty && <span style={{ color: THEME.primarySoft, fontSize: 11 }}>сохранение...</span>}
+          {dirty && (
+            <button
+              onClick={() => onSave(form)}
+              style={{
+                background: "#1D4ED8",
+                border: "none",
+                borderRadius: 5,
+                padding: "3px 10px",
+                color: "white",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Сохранить
+            </button>
+          )}
           <button
             onClick={onClose}
             style={{
