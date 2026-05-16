@@ -16,3 +16,15 @@ Note: This will impact Vite dev & build performances.
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Local Check (Before GitHub/Cloudflare)
+
+- `./run_local.sh dev` запускает Vite dev-сервер (быстрее всего для разработки).
+- `./run_local.sh preview` делает `vite build` и запускает `wrangler dev` (проверка ближе всего к Cloudflare).
+
+### Notion Worker in local dev
+
+- Локально фронт ходит в `/api/*`, а `vite` проксирует эти запросы в worker.
+- По умолчанию target: `https://gtd-worker.snerh6.workers.dev`.
+- Чтобы переопределить worker origin, запустите:
+  - `VITE_WORKER_ORIGIN=https://your-worker.workers.dev ./run_local.sh dev`

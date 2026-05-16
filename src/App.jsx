@@ -37,7 +37,7 @@ const THEME = {
 };
 
 const TASK_STATUSES = [
-  { id: "Inbox", label: "Inbox", icon: "⬇", color: "#94A3B8" },
+  { id: "Inbox", label: "Inbox", icon: "⬇", color: "#d3e0f3" },
   { id: "Next", label: "Next", icon: "▶", color: "#60A5FA" },
   { id: "Waiting", label: "Waiting", icon: "⏳", color: "#FBBF24" },
   { id: "Someday", label: "Someday", icon: "☁", color: "#A78BFA" },
@@ -111,12 +111,8 @@ function itemKey(item) {
 }
 
 async function notionFetch(path, { method = "GET", body } = {}) {
-  //const url = `https://gtd-worker.snerh6.workers.dev/api${path}`;
-  const url = `/api${path}`;
-  //const res = await fetch(url, {
-  //  method,
-  //  ...(body ? { body: JSON.stringify(body) } : {}),
-  //});
+  const apiBase = ENV.VITE_API_BASE_URL ?? "";
+  const url = `${apiBase}/api${path}`;
   const res = await fetch(url, {
     method,
     headers: {
@@ -134,8 +130,15 @@ async function notionFetch(path, { method = "GET", body } = {}) {
     return null;
   }
 
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    const text = await res.text();
+    throw new Error(
+      `Notion proxy returned non-JSON response: ${text.slice(0, 400)}`
+    );
+  }
+
   return res.json();
-  //return res;
 }
 
 async function getDatabase(databaseId) {
@@ -394,6 +397,94 @@ function getTodayAndTomorrow() {
   };
 }
 
+function makeMockId(prefix) {
+  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function createMockData() {
+  const projectHome = { id: "mock_project_home", title: "Дом", status: "Active", notes: "", textFields: {} };
+  const projectWork = { id: "mock_project_work", title: "Работа", status: "Active", notes: "", textFields: {} };
+  const projectArchive = { id: "mock_project_archive", title: "Архив", status: "On Hold", notes: "", textFields: {} };
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+
+  const tasks = [
+    {
+      id: "mock_task_1",
+      createdTime: new Date(now.getTime() - 1000 * 60 * 60 * 5).toISOString(),
+      title: "Разобрать входящие задачи",
+      status: "Inbox",
+      focus: true,
+      projectId: null,
+      contexts: ["компьютер"],
+      energy: "Low",
+      due: today,
+      waitingFor: "",
+      notes: "Проверка интерфейса без Notion API",
+    },
+    {
+      id: "mock_task_2",
+      createdTime: new Date(now.getTime() - 1000 * 60 * 60 * 4).toISOString(),
+      title: "Подготовить weekly review",
+      status: "Next",
+      focus: false,
+      projectId: projectWork.id,
+      contexts: ["компьютер"],
+      energy: "Medium",
+      due: null,
+      waitingFor: "",
+      notes: "",
+    },
+    {
+      id: "mock_task_3",
+      createdTime: new Date(now.getTime() - 1000 * 60 * 60 * 3).toISOString(),
+      title: "Купить лампочку",
+      status: "Waiting",
+      focus: false,
+      projectId: projectHome.id,
+      contexts: ["дом"],
+      energy: "Low",
+      due: null,
+      waitingFor: "доставка",
+      notes: "",
+    },
+    {
+      id: "mock_task_4",
+      createdTime: new Date(now.getTime() - 1000 * 60 * 60 * 2).toISOString(),
+      title: "Идея: улучшить структуру проектов",
+      status: "Someday",
+      focus: false,
+      projectId: projectArchive.id,
+      contexts: ["деревня"],
+      energy: "High",
+      due: null,
+      waitingFor: "",
+      notes: "",
+    },
+    {
+      id: "mock_task_5",
+      createdTime: new Date(now.getTime() - 1000 * 60 * 60).toISOString(),
+      title: "Закрыть старую задачу для теста",
+      status: "Done",
+      focus: false,
+      projectId: projectWork.id,
+      contexts: ["компьютер"],
+      energy: "Medium",
+      due: null,
+      waitingFor: "",
+      notes: "",
+    },
+  ];
+
+  return {
+    projects: [projectHome, projectWork, projectArchive],
+    tasks: tasks.sort(compareByCreatedDesc),
+  };
+}
+
 function isFocusTask(task, today, tomorrow) {
   if (task.status === "Done") {
     return false;
@@ -537,7 +628,7 @@ function buildProjectProps(fields, config) {
   return props;
 }
 
-function ContextInput({ value, onChange, allCtx }) {
+function ContextInput({ value, onChange, allCtx, placeholder = "добавить..." }) {
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -626,7 +717,7 @@ function ContextInput({ value, onChange, allCtx }) {
               setOpen(false);
             }
           }}
-          placeholder={value.length ? "" : "добавить..."}
+          placeholder={value.length ? "" : placeholder}
           style={{
             background: "none",
             border: "none",
@@ -698,18 +789,20 @@ function ContextInput({ value, onChange, allCtx }) {
 function FieldRow({ label, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div
-        style={{
-          color: THEME.primarySoft,
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
+      {label && (
+        <div
+          style={{
+            color: THEME.primarySoft,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            marginBottom: 6,
+          }}
+        >
+          {label}
+        </div>
+      )}
       {children}
     </div>
   );
@@ -836,7 +929,7 @@ function TaskDetailPanel({
           }}
         />
 
-        <FieldRow label="Статус">
+        <FieldRow>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {TASK_STATUSES.map((item) => (
               <button
@@ -862,7 +955,7 @@ function TaskDetailPanel({
           </div>
         </FieldRow>
 
-        <FieldRow label="Фокус">
+        <FieldRow>
           <button
             onClick={() => {
               set("focus", !form.focus);
@@ -886,22 +979,23 @@ function TaskDetailPanel({
           </button>
         </FieldRow>
 
-        <FieldRow label="Заметки">
+        <FieldRow label="">
           <textarea
             value={form.notes}
             onChange={(event) => set("notes", event.target.value)}
+            placeholder="Комментарий (по умолчанию пусто)"
             rows={5}
             style={{ ...fieldInput, resize: "vertical" }}
           />
         </FieldRow>
 
-        <FieldRow label="Проект">
+        <FieldRow label="">
           <select
             value={form.projectId || ""}
             onChange={(event) => set("projectId", event.target.value || null)}
             style={{ ...fieldInput, appearance: "none" }}
           >
-            <option value="">— без проекта</option>
+            <option value="">Проект (по умолчанию: без проекта)</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.title}
@@ -940,19 +1034,21 @@ function TaskDetailPanel({
           </div>
         </FieldRow>
 
-        <FieldRow label="Контекст">
+        <FieldRow label="">
           <ContextInput
             value={form.contexts}
             onChange={(next) => set("contexts", next)}
             allCtx={allCtx}
+            placeholder="Контекст"
           />
         </FieldRow>
 
-        <FieldRow label="Дедлайн">
+        <FieldRow label="">
           <input
             type="date"
             value={form.due || ""}
             onChange={(event) => set("due", event.target.value || null)}
+            placeholder="Дедлайн"
             style={fieldInput}
           />
         </FieldRow>
@@ -962,7 +1058,7 @@ function TaskDetailPanel({
             <input
               value={form.waitingFor}
               onChange={(event) => set("waitingFor", event.target.value)}
-              placeholder="кого / чего..."
+              placeholder="Жду от (по умолчанию пусто)"
               style={fieldInput}
             />
           </FieldRow>
@@ -1131,7 +1227,7 @@ function ProjectDetailPanel({
           }}
         />
 
-        <FieldRow label="Статус">
+        <FieldRow>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {(projectStatuses.length ? projectStatuses : PROJECT_STATUSES).map((status) => (
               <button
@@ -1162,10 +1258,11 @@ function ProjectDetailPanel({
         </FieldRow>
 
         {"notes" in form && (
-          <FieldRow label="Заметки">
+          <FieldRow label="Комментарий">
             <textarea
               value={form.notes || ""}
               onChange={(event) => set("notes", event.target.value)}
+              placeholder="Комментарий (по умолчанию пусто)"
               rows={4}
               style={{ ...fieldInput, resize: "vertical" }}
             />
@@ -1182,6 +1279,7 @@ function ProjectDetailPanel({
                   [name]: event.target.value,
                 })
               }
+              placeholder={`${name} (по умолчанию пусто)`}
               rows={4}
               style={{ ...fieldInput, resize: "vertical" }}
             />
@@ -1242,6 +1340,10 @@ function TaskRow({
         background: active
           ? alpha(THEME.primary, 0.12)
           : "transparent",
+        /*background: active
+          ? alpha(section?.color,0.15)
+          : alpha(section?.color, 0.12),
+          */
         borderLeft: `2px solid ${active ? section?.color || THEME.primary : "transparent"}`,
         display: "flex",
         alignItems: "flex-start",
@@ -1308,7 +1410,8 @@ function TaskRow({
         <div
           style={{
             fontSize: 13,
-            color: done ? alpha(THEME.text, 0.45) : THEME.text,
+            //color: done ? alpha(THEME.text, 0.45) : THEME.text,
+            color: section?.color,            
             textDecoration: done ? "line-through" : "none",
             lineHeight: 1.4,
             marginBottom: 4,
@@ -1494,12 +1597,16 @@ export default function App() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [fallbackInfo, setFallbackInfo] = useState(null);
+  const [offlineMockMode, setOfflineMockMode] = useState(false);
   const [section, setSection] = useState("Inbox");
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
   const [fCtx, setFCtx] = useState(null);
   const [fProj, setFProj] = useState(null);
   const [fEnergy, setFEnergy] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverSection, setDragOverSection] = useState(null);
@@ -1522,6 +1629,7 @@ export default function App() {
   async function load() {
     setLoading(true);
     setError(null);
+    setFallbackInfo(null);
 
     try {
       const [taskSource, projectSource] = await Promise.all([
@@ -1556,8 +1664,16 @@ export default function App() {
       setSources({ tasks: taskSource, projects: projectSource });
       setTasks(parsedTasks);
       setProjects(parsedProjects);
+      setOfflineMockMode(false);
     } catch (err) {
-      setError(err.message);
+      const mockData = createMockData();
+      setSources({ tasks: null, projects: null });
+      setTasks(mockData.tasks);
+      setProjects(mockData.projects);
+      setOfflineMockMode(true);
+      setFallbackInfo(
+        `Notion недоступен, включен локальный mock-режим: ${err.message}`
+      );
     } finally {
       setLoading(false);
     }
@@ -1599,6 +1715,11 @@ export default function App() {
   );
 
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const projectTitles = useMemo(
+    () => new Map(projects.map((project) => [project.id, project.title])),
+    [projects]
+  );
   const projectTaskCounts = useMemo(() => {
     const map = new Map();
     for (const task of tasks) {
@@ -1612,28 +1733,45 @@ export default function App() {
 
   const visibleTasks = useMemo(() => {
     return tasks.filter((task) => {
-      if (section === "Focus") {
-        if (!isFocusTask(task, today, tomorrow)) {
+      if (normalizedQuery) {
+        const projectTitle = task.projectId ? projectTitles.get(task.projectId) || "" : "";
+        const haystack = [
+          task.title,
+          task.notes,
+          task.status,
+          task.waitingFor,
+          task.energy,
+          projectTitle,
+          ...(task.contexts || []),
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedQuery);
+      } else {
+        if (activeProjectId) {
+          if (task.projectId !== activeProjectId) {
+            return false;
+          }
+        } else if (section === "Focus") {
+          if (!isFocusTask(task, today, tomorrow)) {
+            return false;
+          }
+        } else if (task.status !== section) {
           return false;
         }
-      } else if (task.status !== section) {
-        return false;
-      }
-      if (activeProjectId && task.projectId !== activeProjectId) {
-        return false;
-      }
-      if (fCtx && !task.contexts.includes(fCtx)) {
-        return false;
-      }
-      if (fProj && task.projectId !== fProj) {
-        return false;
-      }
-      if (fEnergy && task.energy !== fEnergy) {
-        return false;
+        if (fCtx && !task.contexts.includes(fCtx)) {
+          return false;
+        }
+        if (fProj && task.projectId !== fProj) {
+          return false;
+        }
+        if (fEnergy && task.energy !== fEnergy) {
+          return false;
+        }
       }
       return true;
     });
-  }, [tasks, section, activeProjectId, fCtx, fProj, fEnergy, today, tomorrow]);
+  }, [tasks, section, activeProjectId, fCtx, fProj, fEnergy, today, tomorrow, normalizedQuery, projectTitles]);
 
   const selectedTask =
     selected?.type === "task"
@@ -1647,6 +1785,26 @@ export default function App() {
   const hasFilter = fCtx || fProj || fEnergy;
 
   async function addTask(title) {
+    if (offlineMockMode) {
+      const projectId = activeProjectId || fProj || null;
+      const targetStatus = section === "Focus" ? "Inbox" : section;
+      const mockTask = {
+        id: makeMockId("mock_task"),
+        createdTime: new Date().toISOString(),
+        title,
+        status: targetStatus,
+        focus: section === "Focus",
+        projectId,
+        contexts: [],
+        energy: "",
+        due: null,
+        waitingFor: "",
+        notes: "",
+      };
+      setTasks((current) => [mockTask, ...current].sort(compareByCreatedDesc));
+      return;
+    }
+
     if (!sources.tasks) {
       return;
     }
@@ -1672,6 +1830,15 @@ export default function App() {
   }
 
   async function saveTask(form) {
+    if (offlineMockMode) {
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === form.id ? { ...task, ...form, createdTime: task.createdTime } : task
+        )
+      );
+      return;
+    }
+
     if (!sources.tasks) {
       return;
     }
@@ -1697,6 +1864,15 @@ export default function App() {
   }
 
   async function saveProject(form) {
+    if (offlineMockMode) {
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === form.id ? { ...project, ...form } : project
+        )
+      );
+      return;
+    }
+
     if (!sources.projects) {
       return;
     }
@@ -1719,6 +1895,14 @@ export default function App() {
   }
 
   async function deleteTask(id) {
+    if (offlineMockMode) {
+      setTasks((current) => current.filter((task) => task.id !== id));
+      if (selected?.type === "task" && selected.id === id) {
+        setSelected(null);
+      }
+      return;
+    }
+
     try {
       setError(null);
       await trashPage(id);
@@ -1733,6 +1917,20 @@ export default function App() {
   }
 
   async function deleteProject(id) {
+    if (offlineMockMode) {
+      setProjects((current) => current.filter((project) => project.id !== id));
+      setTasks((current) =>
+        current.map((task) => (task.projectId === id ? { ...task, projectId: null } : task))
+      );
+      if (activeProjectId === id) {
+        setActiveProjectId(null);
+      }
+      if (selected?.type === "project" && selected.id === id) {
+        setSelected(null);
+      }
+      return;
+    }
+
     try {
       setError(null);
       await trashPage(id);
@@ -1753,6 +1951,15 @@ export default function App() {
   }
 
   async function toggleDone(id, newStatus) {
+    if (offlineMockMode) {
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === id ? { ...item, status: newStatus } : item
+        )
+      );
+      return;
+    }
+
     if (!sources.tasks) {
       return;
     }
@@ -1780,6 +1987,13 @@ export default function App() {
   }
 
   async function toggleFocus(id, nextFocus) {
+    if (offlineMockMode) {
+      setTasks((current) =>
+        current.map((task) => (task.id === id ? { ...task, focus: nextFocus } : task))
+      );
+      return;
+    }
+
     if (!sources.tasks) {
       return;
     }
@@ -1805,6 +2019,26 @@ export default function App() {
   }
 
   async function convertTaskToProject(task) {
+    if (offlineMockMode) {
+      const projectId = makeMockId("mock_project");
+      const project = {
+        id: projectId,
+        title: task.title,
+        status: "Active",
+        notes: task.notes || "",
+        textFields: {},
+      };
+      setProjects((current) => [...current, project]);
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === task.id ? { ...item, projectId } : item
+        )
+      );
+      setActiveProjectId(projectId);
+      setSelected({ type: "project", id: projectId });
+      return;
+    }
+
     if (!sources.projects || !sources.tasks) {
       return;
     }
@@ -1853,7 +2087,37 @@ export default function App() {
   }
 
   async function moveTaskToSection(taskId, nextStatus) {
-    if (!sources.tasks || !draggedTaskId) {
+    if (!draggedTaskId) {
+      return;
+    }
+
+    if (offlineMockMode) {
+      if (nextStatus === "Focus") {
+        setDraggedTaskId(null);
+        setDragOverSection(null);
+        await toggleFocus(taskId, true);
+        return;
+      }
+
+      const movedTask = tasks.find((task) => task.id === taskId);
+      if (!movedTask) {
+        return;
+      }
+
+      const nextProjectId = activeProjectId ?? movedTask.projectId ?? null;
+      setTasks((current) =>
+        current.map((task) =>
+          task.id === taskId
+            ? { ...task, status: nextStatus, projectId: nextProjectId }
+            : task
+        )
+      );
+      setDraggedTaskId(null);
+      setDragOverSection(null);
+      return;
+    }
+
+    if (!sources.tasks) {
       return;
     }
 
@@ -2021,8 +2285,9 @@ export default function App() {
             style={{
               width: 22,
               height: 22,
-              borderRadius: 7,
-              background: `linear-gradient(135deg, ${THEME.primaryStrong}, ${THEME.accentStrong})`,
+              borderRadius: 5,
+              //background: `linear-gradient(135deg, ${THEME.primaryStrong}, ${THEME.accentStrong})`,\
+              background: "THEME.text",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -2032,7 +2297,14 @@ export default function App() {
               boxShadow: `0 10px 24px ${alpha(THEME.primaryStrong, 0.28)}`,
             }}
           >
-            G
+          <img src="./public/favicon2.svg"
+              style={{
+                width: 22,
+                height: 22,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              />
           </div>
           <span style={{ fontWeight: 700, fontSize: 14, color: THEME.text }}>
             GTD
@@ -2057,6 +2329,7 @@ export default function App() {
               key={item.id}
               onClick={() => {
                 setSection(item.id);
+                setActiveProjectId(null);
                 if (isMobile) {
                   setSidebarOpen(false);
                 }
@@ -2124,20 +2397,46 @@ export default function App() {
             </div>
           ))}
         </div>
-
         <div style={{ padding: "10px", borderTop: `1px solid ${alpha(THEME.primary, 0.1)}` }}>
-          <div
+          <button
+            onClick={() => setFiltersOpen((current) => !current)}
             style={{
-              color: THEME.primarySoft,
-              fontSize: 9,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: filtersOpen ? alpha(THEME.primary, 0.12) : alpha(THEME.primary, 0.08),
+              border: `1px solid ${alpha(THEME.primary, filtersOpen ? 0.28 : 0.18)}`,
+              borderRadius: 10,
+              padding: "8px 10px",
+              color: THEME.primary,
+              fontSize: 11,
               fontWeight: 700,
-              letterSpacing: "0.1em",
+              letterSpacing: "0.08em",
               textTransform: "uppercase",
-              marginBottom: 8,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              marginBottom: filtersOpen ? 8 : 0,
+            }}
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+              color: THEME.primarySoft,
+              background: alpha(THEME.primary, 0.),
+              border:0,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: filtersOpen ? 8 : 0,
             }}
           >
-            Фильтры
-          </div>
+            <span>Фильтры</span>
+            <span style={{ fontSize: 12, color: THEME.primarySoft }}>{filtersOpen ? "−" : "+"}</span>
+          </button>
+          {filtersOpen && (
+            <div>
           {[
             {
               val: fProj,
@@ -2204,6 +2503,8 @@ export default function App() {
               × сброс
             </button>
           )}
+            </div>
+          )}
         </div>
 
         <div
@@ -2251,20 +2552,18 @@ export default function App() {
           </div>
 
           {projects.map((project) => (
-              <ProjectRow
-                key={project.id}
-                project={project}
-                active={activeProjectId === project.id}
-                selected={selected?.type === "project" && selected.id === project.id}
-                count={projectTaskCounts.get(project.id) ?? 0}
-                onOpen={() => {
-                  setActiveProjectId((current) =>
-                    current === project.id ? null : project.id
-                  );
-                  setSelected({ type: "project", id: project.id });
-                }}
-              />
-            ))}
+            <ProjectRow
+              key={project.id}
+              project={project}
+              active={activeProjectId === project.id}
+              selected={selected?.type === "project" && selected.id === project.id}
+              count={projectTaskCounts.get(project.id) ?? 0}
+              onOpen={() => {
+                setActiveProjectId((current) => (current === project.id ? null : project.id));
+                setSelected({ type: "project", id: project.id });
+              }}
+            />
+          ))}
         </div>
 
         <div style={{ padding: "10px", borderTop: `1px solid ${alpha(THEME.primary, 0.1)}` }}>
@@ -2332,6 +2631,21 @@ export default function App() {
               {activeProject.title}
             </span>
           )}
+          {fallbackInfo && (
+            <span
+              style={{
+                fontSize: 11,
+                color: "#FBBF24",
+                background: alpha("#FBBF24", 0.12),
+                border: `1px solid ${alpha("#FBBF24", 0.22)}`,
+                borderRadius: 999,
+                padding: "3px 9px",
+              }}
+              title={fallbackInfo}
+            >
+              mock режим
+            </span>
+          )}
           {section === "Inbox" && counts.Inbox > 0 && !activeProject && (
             <span
               style={{
@@ -2349,6 +2663,32 @@ export default function App() {
           <span style={{ marginLeft: "auto", fontSize: 11, color: THEME.muted }}>
             {visibleTasks.length} задач
           </span>
+        </div>
+        <div
+          style={{
+            position: "relative",
+            padding: "10px 16px",
+            borderBottom: `1px solid ${alpha(THEME.primary, 0.08)}`,
+            background: alpha(THEME.panel, 0.35),
+          }}
+        >
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Поиск"
+            style={{
+              ...fieldInput,
+              width: "100%",
+              marginBottom: 0,
+              padding: "8px 28px",
+            }}
+          />
+          <div style={{
+            position: "absolute",
+            left: 24,
+            top: 20,
+          }}>
+            🔍</div>
         </div>
 
         <div
@@ -2403,8 +2743,10 @@ export default function App() {
               {isMobile && selected?.type === "project" && selectedContent}
               {visibleTasks.length === 0 ? (
                 <div style={{ padding: "40px 16px", textAlign: "center", color: THEME.muted, fontSize: 13 }}>
-                  {activeProject
-                    ? `В проекте «${activeProject.title}» нет задач со статусом ${section}`
+                  {normalizedQuery
+                    ? "Задачи не найдены"
+                    : activeProject
+                    ? `В проекте «${activeProject.title}» нет задач`
                     : section === "Focus"
                     ? "Нет задач в фокусе и задач на сегодня/завтра"
                     : section === "Inbox"
